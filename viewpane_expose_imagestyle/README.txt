@@ -1,10 +1,10 @@
 About
 =====
-Provides the ability to expose image style to Panel configuration.
+Provides the ability to expose image style to Panel pane configuration.
 
 Current Options
 ---------------
-Allows you to override image style for media fields from pane configuration. 
+Allows you to override image style for image fields from pane configuration. 
 This is handy when you want to use the same Views display for different layouts or themes. 
 
 Installation
