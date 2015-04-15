@@ -1,0 +1,129 @@
+<?php
+/**
+ * @file
+ * Exposes image style setting to Panel pane configuration.
+ */
+
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function viewpane_expose_imagestyle_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'ctools' && $plugin_type == 'content_types') {
+    return 'plugins/' . $plugin_type;
+  }
+}
+
+/**
+ * Implements hook_views_pre_render().
+ */
+function viewpane_expose_imagestyle_views_pre_render(&$view) {
+  // This approach of overriding an image style is only relevant to field based Views.
+  if (!empty($view->style_plugin->row_plugin->definition['uses fields'])) {
+    // If we allowed "Expose Imagestyle Settings" in Pane Settings of the View Content Pane
+    // then swap image style for all results before render.
+    $current_display = $view->current_display;
+    if (!empty($view->display[$current_display]->handler->options['allow']['expose_imagestyle'])) {
+      $conf = $view->display[$current_display]->handler->options['pane_conf'];
+      if (!empty($conf['imagestyle'])) {
+        foreach ($conf['imagestyle'] AS $field_name => $style) {
+          foreach ($view->result as $key => $result) {
+            if (!empty($result->{'field_' . $field_name})) {
+              foreach ($result->{'field_' . $field_name} AS $field_key => $field) {
+                $view->result[$key]->{'field_' . $field_name}[$field_key]['rendered']['#image_style'] = $style;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_views_plugins_alter().
+ */
+function viewpane_expose_imagestyle_views_plugins_alter(&$plugins) {
+  // Swap default handlers in order to extend them.
+  $plugins ['display']['panel_pane']['handler'] = 'viewpane_expose_imagestyle_views_content_plugin_display_panel_pane';
+  $plugins ['display']['panel_pane']['path'] = drupal_get_path('module', 'viewpane_expose_imagestyle') . '/plugins/display';
+  
+  $plugins ['row']['node']['handler'] = 'viewpane_expose_imagestyle_plugin_row_node_view';
+  $plugins ['row']['node']['path'] = drupal_get_path('module', 'viewpane_expose_imagestyle') . '/plugins/row';
+  
+  $plugins ['row']['user']['handler'] = 'viewpane_expose_imagestyle_plugin_row_user_view';
+  $plugins ['row']['user']['path'] = drupal_get_path('module', 'viewpane_expose_imagestyle') . '/plugins/row';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function viewpane_expose_imagestyle_form_views_content_views_panes_content_type_edit_form_alter(&$form, &$form_state, $form_id) {
+  $conf = $form_state['conf'];
+
+  list($name, $display_id) = explode('-', $form_state['subtype_name']);
+  $view = views_get_view($name);
+  $view->set_display($display_id);
+  $allow = $view->display_handler->get_option('allow');
+
+  if ($allow['expose_imagestyle']) {
+    $fields = viewpane_expose_imagestyle_get_media_fields();
+    // Let's store these fields in the $form_state to use them later on the submit.
+    $form_state['fields'] = $fields;
+
+    $imagestyle_options = image_style_options();
+
+    $form['imagestyle'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Imagestyle',
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+
+    foreach ($fields AS $field_name => $field) {
+      $default_value = 'thumbnail';
+      if (!empty($conf['imagestyle'][$field_name])) {
+        $default_value = $conf['imagestyle'][$field_name];
+      }
+
+      $form['imagestyle'][$field_name] = array(
+        '#type' => 'select',
+        '#options' => $imagestyle_options,
+        '#title' => check_plain(ucfirst(str_replace('_', ' ', $field_name)) . ' ( ' . $field_name . ' )'),
+        '#default_value' => $default_value,
+      );
+    }
+    // Append our submit function.
+    $form['#submit'][] = 'viewpane_expose_imagestyle_content_pane_edit_submit';
+  }
+}
+
+/**
+ * Extra submit method to handle imagestyle configuration.
+ */
+function viewpane_expose_imagestyle_content_pane_edit_submit(&$form, &$form_state) {
+  $fields = $form_state['fields'];
+  foreach ($fields AS $field_name => $field) {
+    $form_state['conf']['imagestyle'][$field_name] = $form_state['values'][$field_name];
+  }
+}
+
+/**
+ * Method for getting fields of type image or file.
+ */
+function viewpane_expose_imagestyle_get_media_fields() {
+  // Get map of fields across bundles.
+  $fields = field_info_field_map();
+  // Exclude fields that are not file or image type.
+  foreach ($fields AS $key => $field) {
+    if ($field['type'] != 'image' && $field['type'] != 'file') {
+      unset($fields[$key]);
+    }
+  }
+  // Little dirty trick to add user_picture built-in field.
+  if (variable_get('user_pictures', 0) == 1) {
+    $fields['user_picture'] = array('bundles' => array('user' => array(0 => 'user')), 'type' => 'image');
+  }  
+
+  return $fields;
+}

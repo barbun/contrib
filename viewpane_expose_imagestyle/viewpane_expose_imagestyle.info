@@ -1,0 +1,12 @@
+name = Viewpane Expose Imagestyle
+core = 7.x
+package = Panels
+version = 7.x-1.0-alpha1
+project = viewpane_expose_imagestyle
+dependencies[] = ctools
+dependencies[] = views
+dependencies[] = views_content
+features[ctools][] = views:views_default:3.0
+files[] = plugins/display/viewpane_expose_imagestyle_views_content_plugin_display_panel_pane.inc
+files[] = plugins/row/viewpane_expose_imagestyle_plugin_row_node_view.inc
+files[] = plugins/row/viewpane_expose_imagestyle_plugin_row_user_view.inc
